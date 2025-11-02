@@ -12,7 +12,7 @@ Dự án này cho phép:
 ## Cài đặt
 1. Clone repo:
 ```bash
-git clone 
+git clone https://github.com/Thon-g/AI-Video-Translator.git
 cd repo
 ```
 

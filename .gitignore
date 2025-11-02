@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venv/
+env/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Byte-compiled / cache
+*.log
+*.pot
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+
+# Streamlit cache
+.streamlit/
+.cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Model weights or large files
+*.pth
+*.pt
+*.ckpt
+*.bin
+
+# Other
+*.mp3
+*.wav
+*.mp4
+output/

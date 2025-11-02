@@ -1,0 +1,15 @@
+torch==2.6.0+cu124
+torchaudio==2.6.0+cu124
+pydub
+ollama
+edge-tts
+streamlit
+numpy<2
+demucs
+soundfile
+transformers
+sentencepiece
+googletrans
+faster_whisper
+openai
+google-genai

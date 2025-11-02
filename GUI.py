@@ -9,7 +9,7 @@ from download_video import download_youtube_audio
 from get_transcript import get_transcript
 from language_map import language_map
 from split_video_audio import split_video_audio
-from test import translate_segments
+from translate_transcript import translate_segments
 from text_to_speech import text_to_speech, convertMp3ToWav
 from vocal_isolation import isolate_vocals
 from voice_map import voice_map
@@ -99,8 +99,7 @@ if st.session_state.video_file:
             for i in range(3):
                 translated = translate_segments(segments, origin_lang_code, target_lang_code)
 
-                # translated = asyncio.run(translate_segments_async(segments, origin_lang_code, target_lang_code, model="qwen3", batch_size=20))
-                # LỌC BỎ segments rỗng
+                # lọc segments rỗng
                 translated_filtered = [seg for seg in translated if seg['text'].strip()]
                 list_text = [seg['text'] for seg in translated_filtered]
 

@@ -9,6 +9,9 @@ def download_youtube_audio(url, output_dir="downloads"):
         "yt-dlp",
         "-f", "best",
         "--merge-output-format", "mp4",
+        "--no-check-certificates",
+        "--extractor-retries", "3",
+        "--no-update",
         "-o", output_path,
         url
     ]

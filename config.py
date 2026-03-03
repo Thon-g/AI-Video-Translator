@@ -1,6 +1,6 @@
 # ===== CHỌN PROVIDER =====
-# Có thể chọn: "ollama", "openai", "gemini", "claude"
-TRANSLATION_PROVIDER = "gemini"
+# Có thể chọn: "google", "ollama", "openai", "gemini"
+TRANSLATION_PROVIDER = "google"
 
 # ===== CẤU HÌNH CHO TỪNG PROVIDER =====
 

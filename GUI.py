@@ -78,59 +78,101 @@ audio_concat = os.path.join("final", "audio_concated.wav")
 if st.session_state.video_file:
     if st.button("Bắt đầu xử lý video"):
         final_output = os.path.join("final", Path(st.session_state.video_file).stem + "_completed.mp4")
-        with st.spinner("Đang xử lý ! Đợi xíu đi, hơi lâu đó..."):
-            status = st.empty()
-            # Tách video / audio
-            status.write("Đang tách video và audio...")
-            video_no_audio, audio_path = split_video_audio(st.session_state.video_file, video_no_audio, audio)
+        final_video = None
 
-            status.write("Đang tách vocal và audio nền...")
-            vocals_path, no_vocals_path = isolate_vocals(audio_path, "split_temp")
+        try:
+            with st.spinner("Đang xử lý ! Đợi xíu đi, hơi lâu đó..."):
+                status = st.empty()
 
-            # Lấy transcript
-            status.write("Đang lấy transcript...")
-            result = get_transcript(vocals_path)
-            segments = result["segments"]
-            origin_lang_code = result["language"]
+                # Tách video / audio
+                print("=== START: split_video_audio ===")
+                status.write("Đang tách video và audio...")
+                video_no_audio, audio_path = split_video_audio(st.session_state.video_file, video_no_audio, audio)
+                print("=== DONE: split_video_audio ===")
 
-            # Dịch
-            status.write(f"Đang dịch transcript sang ngôn ngữ {language_map[target_lang_code]}...")
-            list_text_origin = [seg["text"] for seg in segments if seg["text"].strip()]
-            for i in range(3):
-                translated = translate_segments(segments, origin_lang_code, target_lang_code)
+                print("=== START: isolate_vocals ===")
+                status.write("Đang tách vocal và audio nền...")
+                vocals_path, no_vocals_path = isolate_vocals(audio_path, "split_temp")
+                print("=== DONE: isolate_vocals ===")
 
-                # lọc segments rỗng
-                translated_filtered = [seg for seg in translated if seg['text'].strip()]
-                list_text = [seg['text'] for seg in translated_filtered]
+                import torch
+                import gc
 
-                duration_list = [seg["end"] - seg["start"] for seg in segments]
-                count_positive = sum(duration > 0 for duration in duration_list)
-                if len(list_text) == count_positive:
-                    break
+                print("=== Cleaning VRAM ===")
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                gc.collect()
+                import time
 
-            # Text to speech
-            status.write("Đang chuyển văn bản thành giọng nói...")
-            audio_tts_dir = asyncio.run(text_to_speech(list_text, voice_selected))
-            convertMp3ToWav(audio_tts_dir)
+                time.sleep(2)
+                # Lấy transcript
+                print("=== START: get_transcript ===")
+                status.write("Đang lấy transcript...")
 
-            abspath_tts_dir = os.path.abspath(audio_tts_dir)
-            list_target_duration = [float(seg['end'] - seg['start']) for seg in translated_filtered]
+                result = get_transcript(vocals_path)
+                print("=== DONE: get_transcript ===")
 
-            # Chỉnh tốc độ
-            status.write("Đang điều chỉnh lại tốc độ đọc...")
-            list_adjust_tempo(audio_tts_dir, list_target_duration, abspath_tts_dir)
+                segments = result["segments"]
+                origin_lang_code = result["language"]
+                status.write(f"✓ Lấy được {len(segments)} segments")
 
-            # Nối audio
-            status.write("Đang nối các list audio thành một...")
-            merged_vocal_path = merge_tts_segments(translated_filtered, abspath_tts_dir, audio_concat)
+                # Dịch
+                print("=== START: translate_segments ===")
+                status.write(f"Đang dịch transcript sang ngôn ngữ {language_map[target_lang_code]}...")
+                non_empty_origin = [seg for seg in segments if seg["text"].strip()]
+                for i in range(3):
+                    print(f"--- Translation attempt {i + 1} ---")
+                    translated = translate_segments(segments, origin_lang_code, target_lang_code)
+                    translated_filtered = [seg for seg in translated if seg['text'].strip()]
+                    list_text = [seg['text'] for seg in translated_filtered]
+                    # Kiểm tra: số câu dịch không rỗng phải = số segment gốc không rỗng
+                    if len(list_text) == len(non_empty_origin):
+                        break
+                    print(f"[WARN] Mismatch: {len(list_text)} translated vs {len(non_empty_origin)} origin. Retrying...")
+                print("=== DONE: translate_segments ===")
 
-            # Ghép video
-            status.write("Đang ghép audio và video lại với nhau ...")
-            final_video = merge_video_audio(video_no_audio, merged_vocal_path, no_vocals_path, final_output)
-            status.empty()
+                # Text to speech
+                print("=== START: text_to_speech ===")
+                status.write("Đang chuyển văn bản thành giọng nói...")
+                audio_tts_dir = asyncio.run(text_to_speech(list_text, voice_selected))
+                print("=== DONE: text_to_speech (mp3) ===")
 
-        st.success(f"Hoàn tất! Video đã lưu tại: {final_video}")
-        st.video(final_video)
+                convertMp3ToWav(audio_tts_dir)
+                print("=== DONE: convertMp3ToWav ===")
+
+                abspath_tts_dir = os.path.abspath(audio_tts_dir)
+                list_target_duration = [float(seg['end'] - seg['start']) for seg in translated_filtered]
+
+                # Chỉnh tốc độ
+                print("=== START: list_adjust_tempo ===")
+                status.write("Đang điều chỉnh lại tốc độ đọc...")
+                list_adjust_tempo(audio_tts_dir, list_target_duration, abspath_tts_dir)
+                print("=== DONE: list_adjust_tempo ===")
+
+                # Nối audio
+                print("=== START: merge_tts_segments ===")
+                status.write("Đang nối các list audio thành một...")
+                merged_vocal_path = merge_tts_segments(translated_filtered, abspath_tts_dir, audio_concat)
+                print("=== DONE: merge_tts_segments ===")
+
+                # Ghép video
+                print("=== START: merge_video_audio ===")
+                status.write("Đang ghép audio và video lại với nhau ...")
+                final_video = merge_video_audio(video_no_audio, merged_vocal_path, no_vocals_path, final_output)
+                print("=== DONE: merge_video_audio ===")
+
+                status.empty()
+                st.success(f"Hoàn tất! Video đã lưu tại: {final_video}")
+                st.video(final_video)
+
+        except Exception as e:
+            print(f"=== ERROR: {str(e)} ===")
+            st.error(f"❌ Lỗi xảy ra: {str(e)}")
+            import traceback
+
+            print(traceback.format_exc())
+            st.code(traceback.format_exc())
+            st.stop()
 
         # # tải video về
         # with open(final_video, "rb") as file:

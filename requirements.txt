@@ -2,6 +2,7 @@ torch==2.6.0+cu124
 torchaudio==2.6.0+cu124
 pydub
 ollama
+deep-translator
 edge-tts
 streamlit
 numpy<2

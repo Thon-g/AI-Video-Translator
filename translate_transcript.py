@@ -11,12 +11,18 @@ def clean_translation(text):
 
 def translate_segments(segments, origin_lang_code, target_lang_code):
     t0 = time.time()
-    list_text = [seg['text'].strip() for seg in segments if seg['text'].strip()]
+    # Lưu vị trí các segment có text không rỗng
+    non_empty_indices = [i for i, seg in enumerate(segments) if seg['text'].strip()]
+    list_text = [segments[i]['text'].strip() for i in non_empty_indices]
     origin_lang = language_map[origin_lang_code]
     target_lang = language_map[target_lang_code]
 
     if origin_lang_code == target_lang_code:
         return segments
+
+    if not list_text:
+        print("[WARN] Không có segment nào có text để dịch.")
+        return [{"start": seg["start"], "end": seg["end"], "text": ""} for seg in segments]
 
     system_prompt = f"""
     You are a translation engine. 
@@ -39,7 +45,37 @@ def translate_segments(segments, origin_lang_code, target_lang_code):
     # --- Chọn provider ---
     provider = config.TRANSLATION_PROVIDER.lower()
 
-    if provider == "ollama":
+    if provider == "google":
+        from deep_translator import GoogleTranslator
+        translated = []
+        j = 0
+        for i, seg in enumerate(segments):
+            if i in non_empty_indices and j < len(list_text):
+                try:
+                    translated_text = GoogleTranslator(
+                        source=origin_lang_code, target=target_lang_code
+                    ).translate(list_text[j])
+                except Exception as e:
+                    print(f"[WARN] Google Translate lỗi segment {j}: {e}")
+                    translated_text = list_text[j]  # fallback giữ nguyên gốc
+                translated.append({
+                    "start": seg["start"],
+                    "end": seg["end"],
+                    "text": translated_text.strip() if translated_text else ""
+                })
+                j += 1
+            else:
+                translated.append({
+                    "start": seg["start"],
+                    "end": seg["end"],
+                    "text": ""
+                })
+        t1 = time.time()
+        print(f"Thời gian dịch (Google Translate): {t1 - t0:.2f}s")
+        print(f"[INFO] Segments gốc: {len(segments)}, non-empty: {len(non_empty_indices)}, translated: {len(translated)}")
+        return translated
+
+    elif provider == "ollama":
         from ollama import chat as ollama_chat
         model = config.OLLAMA_MODEL
         messages = [
@@ -60,7 +96,6 @@ def translate_segments(segments, origin_lang_code, target_lang_code):
         completion = openai.chat.completions.create(model=model, messages=messages)
         raw_text = completion.choices[0].message.content
 
-
     elif provider == "gemini":
         from google import genai
         client = genai.Client(api_key=config.GEMINI_API_KEY)
@@ -76,25 +111,40 @@ def translate_segments(segments, origin_lang_code, target_lang_code):
         raise ValueError(f"Provider {provider} chưa được hỗ trợ!")
 
     result = clean_translation(raw_text)
-    translated_lines = result.splitlines()
+    # Lọc bỏ dòng trống trong kết quả dịch (LLM đôi khi thêm dòng trống)
+    translated_lines = [line for line in result.splitlines() if line.strip()]
 
     # Nếu thiếu dòng, bổ sung ""
     if len(translated_lines) < len(list_text):
+        print(f"[WARN] LLM trả về thiếu dòng: {len(translated_lines)} / {len(list_text)}")
         translated_lines += [""] * (len(list_text) - len(translated_lines))
 
     # Nếu thừa dòng -> cắt bớt
+    if len(translated_lines) > len(list_text):
+        print(f"[WARN] LLM trả về thừa dòng: {len(translated_lines)} / {len(list_text)}")
     translated_lines = translated_lines[:len(list_text)]
 
+    # Ghép kết quả dịch đúng vào vị trí segment gốc
     translated = []
-    for seg, new_text in zip(segments, translated_lines):
-        translated.append({
-            "start": seg["start"],
-            "end": seg["end"],
-            "text": new_text.strip()
-        })
+    j = 0  # index cho translated_lines
+    for i, seg in enumerate(segments):
+        if i in non_empty_indices and j < len(translated_lines):
+            translated.append({
+                "start": seg["start"],
+                "end": seg["end"],
+                "text": translated_lines[j].strip()
+            })
+            j += 1
+        else:
+            translated.append({
+                "start": seg["start"],
+                "end": seg["end"],
+                "text": ""
+            })
 
     t1 = time.time()
     print(f"Thời gian dịch: {t1 - t0:.2f}s")
+    print(f"[INFO] Segments gốc: {len(segments)}, non-empty: {len(non_empty_indices)}, translated: {len(translated)}")
     return translated
 
 

@@ -1,8 +1,17 @@
+import gc
 import shutil
 import subprocess
 import os
 
+import torch
+
+
 def isolate_vocals(input_audio_path: str, output_dir: str):
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
+    gc.collect()
+
     os.makedirs(output_dir, exist_ok=True)
     model_name = "htdemucs"
     cmd = [
@@ -29,6 +38,10 @@ def isolate_vocals(input_audio_path: str, output_dir: str):
 
     # Xóa folder phụ
     shutil.rmtree(os.path.join(output_dir, model_name))
+
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    gc.collect()
 
     return vocals_dst, no_vocals_dst
 

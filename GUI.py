@@ -1,5 +1,6 @@
 import asyncio
 import os
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 import subprocess
 from pathlib import Path
 import streamlit as st

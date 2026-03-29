@@ -2,6 +2,7 @@ import gc
 import shutil
 import subprocess
 import os
+import sys
 
 import torch
 
@@ -15,7 +16,7 @@ def isolate_vocals(input_audio_path: str, output_dir: str):
     os.makedirs(output_dir, exist_ok=True)
     model_name = "htdemucs"
     cmd = [
-        "demucs",
+        sys.executable, "-m", "demucs.separate",
         "-n", model_name,
         "--two-stems", "vocals",
         "-o", output_dir,
